@@ -1,14 +1,17 @@
 import streamlit as st
-from llm_chains import load_normal_chain
+from llm_chains import load_normal_chain, load_pdf_chat_chain
 from langchain.memory import StreamlitChatMessageHistory
 import yaml
 import os
 from utils import save_chat_history_json, get_timestamps , load_chat_history_json
+from pdf_handler import add_documents_to_db
 
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 def load_chain(chat_history):
+    if st.session_state.pdf_chat:
+        return load_pdf_chat_chain(chat_history)
     return load_normal_chain(chat_history)
 
 
@@ -19,6 +22,9 @@ def clear_input_fileld():
 def set_send_input():
     st.session_state.send_input =  True
     clear_input_fileld()
+
+def toggle_pdf_chat():
+    st.session_state.pdf_chat = True
 
 def save_chat_history():
     if st.session_state.history != []:
@@ -52,7 +58,8 @@ def main():
     #auto select the chat session to not a new session
     index = chat_sessions.index(st.session_state.session_index_tracker)   
     st.sidebar.selectbox("Select Chat Session", chat_sessions, key="session_key", index=index, on_change=track_index)
-   
+    st.sidebar.toggle("PDF Chat", key="pdf_chat", value=False)
+
     if st.session_state.session_key != "new_session":
         st.session_state.history = load_chat_history_json(config["chat_history_path"] + st.session_state.session_key)   
     else:
@@ -60,19 +67,22 @@ def main():
     chat_history = StreamlitChatMessageHistory(key="history") 
     llm_chain = load_chain(chat_history)
 
+    uploaded_pdf = st.sidebar.file_uploader("up;pad an pdf file", accept_multiple_files=True, key="pdf_upload", type=['pdf'], on_change=toggle_pdf_chat)
+    
+    if uploaded_pdf:
+        with st.spinner("Processing pdf....."):
+            add_documents_to_db(uploaded_pdf)
 
     user_input = st.text_input("Type your message here", key="user_input", on_change=set_send_input)
-    send_button = st.button("Send", key="send_button")
+    send_button = st.button("Send   ", key="send_button")
 
     if send_button or st.session_state.send_input:
         if st.session_state.user_question != "":
-            
-            with chat_container:
-                st.chat_message("user").write(st.session_state.user_question)
-                
-                llm_response = llm_chain.run(st.session_state.user_question)
-                st.chat_message("ai").write(llm_response)
-                st.session_state.user_question = ""
+            llm_chain = load_chain(chat_history)
+            llm_response = llm_chain.run(st.session_state.user_question)
+            st.session_state.user_question = ""
+
+        st.session_state.send_input = False
 
 
     # Display chat history in UI

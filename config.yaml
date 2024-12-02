@@ -1,5 +1,6 @@
 model_path:
-  large: "model/mistral-7b-instruct-v0.1.Q5_K_M.gguf"
+  large: "./Mistral-7B-v0.1/"
+  #large: "model/mistral-7b-instruct-v0.1.Q5_K_M.gguf"
 
 
 
